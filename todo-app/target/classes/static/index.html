@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <title>ToDo Application</title>
+    <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+<div class="container">
+    <h1>ToDo List Application</h1>
+    <form id="task-form">
+        <input type="text" id="task-title" placeholder="Task Title" required>
+        <input type="text" id="task-description" placeholder="Task Description" required>
+        <button type="submit">Add Task</button>
+    </form>
+
+    <ul id="task-list">
+        <!-- Tasks will be appended here -->
+    </ul>
+</div>
+
+<script>
+    let tasks = [];
+    let editingTaskIndex = null;
+
+    const form = document.getElementById('task-form');
+    const taskList = document.getElementById('task-list');
+
+    // Fetch existing tasks when the page loads
+    window.onload = fetchTasks;
+
+    form.addEventListener('submit', function(event) {
+        event.preventDefault();
+        const taskTitle = document.getElementById('task-title').value;
+        const taskDescription = document.getElementById('task-description').value;
+
+        if (editingTaskIndex !== null) {
+            // Edit existing task
+            const updatedTask = {
+                title: taskTitle,
+                description: taskDescription,
+                completed: tasks[editingTaskIndex].completed
+            };
+            updateTask(tasks[editingTaskIndex].id, updatedTask);
+        } else {
+            // Add new task
+            const newTask = {
+                title: taskTitle,
+                description: taskDescription,
+                completed: false
+            };
+            createTask(newTask);
+        }
+    });
+
+    async function fetchTasks() {
+        const response = await fetch('/api/tasks');
+        tasks = await response.json();
+        renderTasks();
+    }
+
+    async function createTask(task) {
+        const response = await fetch('/api/tasks', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(task),
+        });
+        const newTask = await response.json();
+        tasks.push(newTask);
+        document.getElementById('task-title').value = '';
+        document.getElementById('task-description').value = '';
+        renderTasks();
+    }
+
+    async function updateTask(id, updatedTask) {
+        const response = await fetch(`/api/tasks/${id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(updatedTask),
+        });
+        const updated = await response.json();
+        tasks[editingTaskIndex] = updated; // Update the task in the local array
+        editingTaskIndex = null;
+        document.getElementById('task-title').value = '';
+        document.getElementById('task-description').value = '';
+        renderTasks();
+    }
+
+    async function deleteTask(id) {
+        await fetch(`/api/tasks/${id}`, { method: 'DELETE' });
+        tasks = tasks.filter(task => task.id !== id);
+        renderTasks();
+    }
+
+    function toggleCompletion(index) {
+        const task = tasks[index];
+        task.completed = !task.completed;
+        updateTask(task.id, task);
+    }
+
+    function editTask(index) {
+        const task = tasks[index];
+        document.getElementById('task-title').value = task.title;
+        document.getElementById('task-description').value = task.description;
+        editingTaskIndex = index;
+    }
+
+    function renderTasks() {
+        taskList.innerHTML = '';
+        tasks.forEach((task, index) => {
+            const listItem = document.createElement('li');
+            listItem.textContent = `${task.title} - ${task.description} (${task.completed ? "Completed" : "Pending"})`;
+
+            const toggleButton = document.createElement('button');
+            toggleButton.textContent = task.completed ? 'Mark as Incomplete' : 'Mark as Complete';
+            toggleButton.onclick = () => toggleCompletion(index);
+
+            const editButton = document.createElement('button');
+            editButton.textContent = 'Edit';
+            editButton.onclick = () => editTask(index);
+
+            const deleteButton = document.createElement('button');
+            deleteButton.textContent = 'Delete';
+            deleteButton.onclick = () => deleteTask(task.id);
+
+            listItem.appendChild(toggleButton);
+            listItem.appendChild(editButton);
+            listItem.appendChild(deleteButton);
+            taskList.appendChild(listItem);
+        });
+    }
+</script>
+</body>
+</html>
